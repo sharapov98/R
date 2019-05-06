@@ -1,0 +1,408 @@
+---
+title: "(YSC2210) DAVis Final Project -- igraph"
+author: Tram Hoang, ZhongXuan Khwa, Jacob Jarabejo, Damon Wei Da Lim, YuChen Jin,
+  Abdul Sharapov
+date: "12 April 2019"
+output:
+  pdf_document:
+    toc: yes
+---
+
+# Introduction 
+According to [The Comprehensive R Archive Network (CRAN)](https://cran.r-project.org/web/packages/igraph/igraph.pdf), igraph is a library and R package for network analysis, which is applied across different fields like physical, biological, information systems, etc. An example of a network could be online platforms such as Facebook and Twitter. These online platforms facilitate the formation of a social network amongst a group of individuals. A network, in the formal language of mathematics, is called a **graph**. The study of graphs, i.e., the study of networks, is captured by [Graph Theory](https://en.wikipedia.org/wiki/Graph_theory). Before we proceed, let us unpack a few essential terms and definitions found in Graph Theory as it will help us understand the significance of the igraph package. 
+
+### Terms & Definitions
++ **Graph**: A graph is made up of **vertices**, also known as nodes or points, and these vertices are connected by **edges**, which are also known as links or lines. 
++ **Directed Graph**: A directed graph refers to a set of vertices (nodes) that are connected by edges (links) that have a direction associated with them. Directed edges are denoted by an ordered pair of vertices, where an edge $(1,2)$ represents the edge going from vertex $1$ to vertex $2$.
++ **Undirected Graph**: An undirected graph refers to a set of vertices (nodes) that are connected by edges that do __not__ have a direction associated with them. Undirected edges are denoted by an unordered pair of vertices. 
+
+# Networks in igraph
+Before we embark on this journey of graph creation (visualisation of networks), we first need to install and load the igraph package. 
+```{r, message = FALSE}
+library(igraph) 
+```
+
+
+##Creating a graph
+
+There are various ways to create a graph. Let's start with creating an *empty* graph.
+```{r, fig.width = 3.5, fig.align='center'}
+g <- make_empty_graph(n = 10)
+plot(g, vertex.label = NA) #set vertices labels to be empty for clarity of the graph
+```
+
+Thus we have created a graph that has 10 vertices with no edges that connect them.
+
+We can see the class of a graph is `igraph`.
+
+```{r}
+class(g)
+```
+
+
+
+On the other hand, we can also create a fully connected graph, or a *full* graph, that has all of the vertices connected. We find that with default arguments, the graph that the function plots is an undirected graph which does not have *self loops*. Self- loops are edges that go from a vertice back to itself. We can make a graph a directed graph with self-loops with the arguments `directed` and `loops`. Notice how, in a fully connected directed graph, there are edges pointing at and away from all vertices.
+
+```{r, fig.width = 3, fig.align='center', fig.show='hold'}
+g1 <- make_full_graph(n = 10)
+plot(g1, vertex.label = NA)
+
+g2 <- make_full_graph(n = 10, directed = TRUE, loops = TRUE)
+plot(g2, vertex.label = NA)
+```
+
+
+Other predefined graph structures include *star* graphs, *tree* graphs, and *ring* graphs.
+
+```{r, fig.show='hold', fig.width = 3, fig.align = 'center'}
+g_star <- make_star(10) #make a star graph
+g_tree <- make_tree(10) #make a tree graph
+g_ring <- make_ring(10) #make a ring graph
+
+plot(g_star, vertex.label = NA) #Notice all edges point at the center vertex
+plot(g_tree, vertex.label = NA)
+plot(g_ring, vertex.label = NA)
+```
+
+
+##Edges
+
+Finally, we can create graphs with a given list of edges. By default, the labels for the edges are integers, which, so far, we have been removing using the argument `vertex.label = NA` when plotting. The function `graph` takes arguments `edges`, which is an ordered vector of vertices, where each pair represents an edge, `n`, which is the number of vertices, as well as `directed` to show whether a graph is directed or not.
+
+```{r, fig.show='hold', fig.width = 3, fig.align = 'center'}
+ed <- c(1,2,2,3,3,4,4,1)
+g3 <- graph(ed, n = 10, directed = TRUE)
+plot(g3)
+```
+
+From the way we define the `ed` vector, we defined a directed edge from vertex `1` to vertex `2`, a directed edge from vertex `2` to vertex `3`, and so on. We can find the edges of a graph by running the function `E()`. Similarly, use function `V()` to find the vertices of a graph.
+
+```{r}
+E(g3)
+V(g3)
+```
+
+Thus, directed edges are represented with arrows `->` (for example `1->2`). The edges of undirected graphs are represented with `--`.
+
+```{r}
+g4 <- graph(ed, directed = FALSE)
+E(g4)
+```
+
+We can also use strings as labels for the graphs. The argument `isolates=` in the `graph` function allows us to include vertices that do not have edges the connect them to other vertices.\
+
+```{r, fig.width = 3, fig.align = 'center'}
+string_graph <- graph(c("ZhongXuan", "Jacob", "Abdul", "Damon", "Damon", "ZhongXuan",
+                        "Jacob", "Abdul", "Abdul", "Damon", "Yuchen", "Yuchen"),
+                      isolates = c("Tram"),
+                      directed = FALSE)
+plot(string_graph)
+```
+
+Thus, we have created a network of the 2PM DAVIS Group (this is not a true representation of our group).
+
+##Edge Attributes
+
+
+The names of the vertices (or labels as we have been referring to them) are already generated once we assigned vertices. \
+
+```{r}
+V(string_graph)$name
+E(string_graph)
+```
+\
+
+We can add attributes to either our vertices or edges. For vertices, we can assign the attribute of `gender`. For edges, we can assign the attributes such as `relationship` or `weights`.\
+
+```{r}
+V(string_graph)$gender <- c("male", "male", "male", "male", "female", "female")
+E(string_graph)$relationship <- c("junior/sophomore", "acquaintance", "best friends",
+                                  "friends", "acquaintance", "self")
+E(string_graph)$weight <- 10 #adding attributes is vectorised so 10 is added to all edges
+```
+
+\
+To view the attributes of the vertices and edges, use functions `vertex_attr()` and `edge_attr(g4)`.\
+
+
+```{r}
+vertex_attr(string_graph)
+edge_attr(string_graph)
+```
+\
+
+Our graph currently has repeating edges and with loops. We can simplify our graph using the function `simplify`. We can use the `edge.attr.comb` argument to decide how to handle the edge's attributes (by either finding the sum, product, mean, min, or max). We can also disregard and drop another attribute with the option "ignore". \
+
+
+```{r, fig.width = 3, fig.align = 'center'}
+g_simple <- simplify(string_graph, 
+                     remove.multiple = TRUE, 
+                     remove.loops = TRUE,
+                     edge.attr.comb = c(weight="sum", relationship="ignore"))
+plot(g_simple)
+edge_attr(g_simple)
+```
+
+# Reading Network Data from Files 
+### Dataset: EdgeList 
+
+In this reading, we will work primarily on the following two data sets containing data about the media organisations. This data involves a network of hyperlinks and mentions in news sources.
+
+```{r, message = FALSE}
+nodes1 <- read.csv("Dataset1-Media-Example-NODES.csv", header=TRUE, as.is=TRUE)
+edges1 <- read.csv("Dataset1-Media-Example-EDGES.csv", header=TRUE, as.is=TRUE)
+```
+
+Examining the data:
+```{r}
+head(nodes1)
+length(unique(nodes1$id)) #output reflects the number of unique nodes
+head(edges1)
+nrow(edges1) #number of edges
+```
+
+# Turning Networks into igraph Objects
+
+Once imported, let's create a graph variable by using functions `graph_from_data_frame` and simplify our graph to avoid any loops and repeting edges.
+
+```{r}
+G1 <- graph_from_data_frame(d = edges1, vertices = nodes1, directed = TRUE)
+G1 <- G1 %>% simplify(remove.multiple = FALSE, remove.loops = TRUE)
+```
+
+
+# Plotting Graphs with igraph
+
+In the sections above, we've seen numerous plots of graphs to help us visualise the networks we are creating. Plotting graphs is not a trivial task, and the `igraph` package comes with various tools that will help us visualise our graphs in an effective matter.
+
+## The Basics
+
+As seen above, in order to make a simple plot, the `igraph` package makes use of the `plot()` function to plot the graphs. These plots act as a **high-level** plot, and work like R's regular plotting function. 
+
+```{r, fig.align="center"}
+# A simple plot
+plot(G1)
+```
+
+Just like our other base graphic plots, we are able to change various attributes of the plot to change the way it looks. For example, the graph we've made above is a little cluttered and does not contain much information. We can add labels and change various attributes on the vertices to make it look better. This can be done in 2 ways. The first way, which is the way we are most used to, is to add attributes directly to the `plot()` function.
+
+```{r, fig.width = 4, fig.align = 'center'}
+plot(G1,
+     vertex.size = 4,
+     vertex.shape = "square",
+     vertex.color = "grey40",
+     vertex.label = nodes1$media,
+     vertex.label.color = "black",
+     vertex.label.dist = 1.2,
+     vertex.label.cex = 0.6)
+```
+
+As demonstrated, we managed to adjust some of the attributes on the vertex to make it a more readable graph. The attributes are relatively understandable - `vertex.size` adjusts the size of each vertex, `vertex.dist` adjusts the distance the label is from the center of the vertex, and so on. We also manually added the labels under `vertex.labels`, where we input a character vector corresponding to the names of each respective vertex.
+
+Our graph is more readable, but the edges are still very messy. We can also add attributes to the edges to change the way they look as well. The various options for these adjustments, and the ones on the vertices, can be found via `?igraph.plotting`.
+
+```{r, fig.width = 4, fig.align = 'center'}
+plot(G1,
+     vertex.size = 4,
+     vertex.shape = "square",
+     vertex.color = "grey30",
+     vertex.label = nodes1$media,
+     vertex.label.color = "black",
+     vertex.label.dist = 1.2,
+     vertex.label.cex = 0.6,
+     edge.arrow.size = 0.3,
+     edge.curve = .2,
+     edge.width = 0.6,
+     edge.color = "gray80")
+```
+
+
+So far, we've added the attributes into the plot function itself. However, those attributes only affect the specific plot function, and will have to be added everytime we plot the graph. Another option that we have, which addresses this problem, would be to add our plotting attributes to the `igraph` data structure itself.
+
+```{r, fig.width=4, fig.align="center"}
+# Recreating the previous graph
+V(G1)$color <- "grey30"
+V(G1)$size <- 4
+V(G1)$shape <- "square"
+
+V(G1)$label <- nodes1$media
+V(G1)$label.color <- "black"
+V(G1)$label.dist <- 1.2
+V(G1)$label.cex <- 0.6
+
+E(G1)$arrow.size <- 0.3
+E(G1)$curve <- .2
+E(G1)$width <- 0.6
+E(G1)$color <- "gray80"
+  
+plot(G1)
+```
+
+This is a great method as it reduces the amount of repeated code we would need to type when plotting our graphs. Another thing to note about this method is that any attributes manually inputted into the `plot()` function will override the ones assigned in the graph.
+
+```{r, fig.width=4, fig.align="center"}
+plot(G1, edge.color = "#FF000060", vertex.shape = "circle")
+```
+
+
+## Conditional Changes
+As we've seen in our previous class exercises, a lot of information can be visualised with attributes like colour and size. Seeing as how we are able to do formatting by adding the attributes directly into the dataset, we can easily implement this.
+
+```{r, fig.width=4, fig.align="center"}
+V(G1)$shape <- "circle"
+V(G1)$label <- NA
+
+# Colours based on Media Type
+clrs <- c("blue", "cyan", "magenta")
+V(G1)$color <- clrs[nodes1$media.type]
+
+# Node size by audience size
+V(G1)$size <- nodes1$audience.size * 0.5
+
+# Set edge width by weight
+E(G1)$width <- 1 + E(G1)$weight/12
+
+plot(G1)
+```
+
+## Layout
+In our previous examples, some of you may have noticed the fact that the layout of the vertices is not fixed, i.e. they change around randomly at times. The `igraph` package contains a few functions that could help specify a layout to display the vertices in.
+
+To begin, we generate a slightly larger graph, using a function called `simple_pa()` which generates a simple graph by adding vertices and edges sequentially based on a preset level of preferential attachment. This method is called the Barabasi-Albert Model.
+
+```{r, fig.width=4, fig.align="center"}
+big <- sample_pa(100)
+
+V(big)$size <- 6
+V(big)$frame.color <- "white"
+V(big)$color <- "red"
+V(big)$label <- ""
+E(big)$arrow.mode <- 0
+
+plot(big)
+```
+
+You can change the layout directly in the plot function. `igraph` contains a number of preset layout functions, like `layout_randomly`.
+
+```{r, fig.width=4, fig.align="center"}
+plot(big, layout = layout_randomly)
+```
+
+We see that the layouts are just matrices with coordinate values for each vertex in the graph.
+
+```{r, fig.width=4, fig.align="center"}
+l <- layout_randomly(big)
+head(l)
+```
+
+To get some nice visualisations of certain types of graphs, there are algorithms that can help us generate a visually appealing layout. One such algorithm is the **Fruchterman-Reingold algorithm**. 
+
+The **Fruchterman-Reingold algorithm** is one of the most commonly used *force-directed layout* algorithms. Force-directed layout algorithms try to get nice-looking graphs where the edges are constant in length and the vertices overlap as little as possible. Thus vertices are very distributed, and vertices that share the most connections are closer to each other. However, the algorithm is fairly slow and is usually not used on graphs with more than 1000 vertices. 
+
+```{r, fig.width=3, fig.align="center", fig.show='hold'}
+plot(big, layout = layout_with_fr)
+plot(big, layout = layout_with_fr)
+```
+
+The layout is not deterministic, ie. it will change shape on every run. To keep it constant, we can assign the layout to a variable `l` to keep it constant.
+
+```{r, fig.width=5, fig.align="center"}
+l <- layout_with_fr(big)
+par(mfrow=c(1,2), mar=c(1,1,1,1))
+plot(big, layout = l)
+plot(big, layout = l)
+```
+
+
+Here are some of the other layouts that can be interesting to try plotting!
+```{r, fig.show='hold', fig.width = 5, fig.align = 'center'}
+par(mfrow=c(3,3), mar=c(1,1,1,1))
+plot(big, layout = layout_as_star, main = "layout_as_star")
+plot(big, layout = layout_components, main = "layout_components")
+plot(big, layout = layout_in_circle, main = "layout_in_circle")
+plot(big, layout = layout_nicely, main = "layout_nicely")
+plot(big, layout = layout_on_grid, main = "layout_on_grid")
+plot(big, layout = layout_on_sphere, main = "layout_on_sphere")
+```
+
+# Simple Graph / Network Algorithms
+
+## Vertex Degree
+
+A **degree** of a vertex is the number of edges connected to the vertex. With `igraph`, the function `degree()` has a mode `in` for in-degree, `out` for out-degree, and `all` for all the degrees of a vertex. 
+
+Let's plot a graph where the size of the vertex depends on the degree of the vertex.
+
+```{r, fig.align='center', fig.width=3}
+deg <- degree(G1, mode = "all") #we were account for all of the vertices
+plot(G1, vertex.size = deg * 2) #multiply by 2 to increase the size
+```
+
+## Shortest Path
+
+To visualise the shortest path from a vertex to a vertex, we use the function `shortest_paths()`. Our arguments into the function are the graph, the vertex we're going from and to, as well as argument `output = "both"` to indicate that our output would have both verteces and edges. Say, let's find the shortest path between MSNBC and the New York Post.
+
+```{r, fig.align='center', fig.width=3}
+G1 <- as.undirected(G1) #making G1 into a undirected graph
+G1 <- simplify(G1, remove.multiple = TRUE, remove.loops = TRUE)
+
+news.path <- shortest_paths(G1,
+                            from = V(G1)[media == "MSNBC"],
+                            to = V(G1)[media == "New York Post"],
+                            output = "both")
+
+#Let's graph the path!
+ecol <- rep("gray80", ecount(G1)) #function ecount() counts number of edges in a graph
+ecol[unlist(news.path$epath)] <- "orange" #color the edges of the path orange
+
+#Fixing the edge width - setting all edges to width 2, but the path to have width 4
+ew <- rep(2, ecount(G1)) 
+ew[unlist(news.path$epath)] <- 4
+
+#Change colour of the vertices of the path to gold
+vcol <- rep("gray40", vcount(G1)) 
+vcol[unlist(news.path$vpath)] <- "gold"
+
+plot(G1, 
+     vertex.color=vcol, 
+     edge.color=ecol, 
+     edge.width=ew, 
+     edge.arrow.mode= FALSE)
+```
+
+##Community Detection
+
+One of the ways to detect communities in a network is using **edge betweenness**. High betweenness edge is an edge that has the greatest number of shortest path that go through it. In other words, it is more likely to be a bridge or connector between two parts of a network. The algorithm that looks for communities based on edge betweenness (also known as Newman-Girvan) removes high-betweenness edges and the best partitioning of the network is selected. The function we are going to use is called `cluster_edge_betweenness()`.
+
+```{r, message = FALSE, fig.align='center', fig.width=3}
+comm <- cluster_edge_betweenness(G1)
+plot(comm, G1)
+```
+
+
+We can see how the verteces are split using the `dendPlot()` function.
+
+```{r, fig.align='center', fig.width=3}
+dendPlot(comm, mode="hclust")
+```
+
+Let's examine the communities!
+
+```{r}
+class(comm)
+length(comm) #number of communities
+membership(comm) #which vertex belongs to which community
+```
+
+
+# Sources
+
+[Package ‘igraph’](https://cran.r-project.org/web/packages/igraph/igraph.pdf)
+
+[iGraph tutorial](https://rstudio-pubs-static.s3.amazonaws.com/74248_3bd99f966ed94a91b36d39d8f21e3dc3.html?fbclid=IwAR0VFaHhgshIwqSv1YfJFFxhrjgLCuOoqCkyvq7kecZtOhjGVKXp1jnQupU)
+
+[Network analysis with R and igraph: NetSci X Tutorial](https://kateto.net/networks-r-igraph) 
+
+[Graph Theory](https://en.wikipedia.org/wiki/Graph_theory)
+
+[Graph Theory Overview: YouTube](https://www.youtube.com/watch?v=82zlRaRUsaY)

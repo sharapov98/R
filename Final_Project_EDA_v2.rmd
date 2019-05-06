@@ -1,0 +1,521 @@
+---
+title: "Final Project EDA"
+author: "Abdul, Dhivesh, Moni, Tram"
+fig_width: 10
+fig_height: 8
+output:
+  html_document: default
+  pdf_document: default
+---
+
+#Research Question: 
+##Can we use economic variables and variables related to freedom in a country to classify if a country is democratic?
+
+We believe that variables in our dataset will have strong predictive power of a country's democratic score. We know from domain knowledge that on average, democratic countries exhibit the following traits:
+
+a) They are generally richer.
+b) They engage in more trade.
+c) They have governments that uphold a higher level of integrity.
+d) They have higher Foreign Direct Investment inflows.
+
+In our attempt to classify countries, we will use a logistic regression. We can evaluate the model fit using the techniques learnt in class.
+
+Firstly, we will pick variables which the strongest corelation with our outcome based on our domain knowledge. Thus, we will perform stepwise regression with logistic regression and include AUC calculations and plots of TPR and FPR against the $\alpha$ threshold. 
+
+Further, we want to run a logistic lasso, something that we have not attempted in class. We can evaluate the first model against the second using the same techniques described above. Thus, we would get an overview whether context/domain knowledge is backed up by real data.
+
+Lastly, we will perform decision trees to evaluate based on what attribute can we predict whether a country is democratic.
+
+#### Data Cleaning
+```{r cars}
+library(readxl)
+df <- read_excel("economic_freedom2019.xlsx")
+df[df == "N/A"]  <- NA
+
+# remove $
+df$`GDP (Billions, PPP)` <- gsub('$', '', df$`GDP (Billions, PPP)`, fixed = TRUE)
+df$`GDP per Capita (PPP)` <- gsub('$', '', df$`GDP per Capita (PPP)`, fixed = TRUE)
+
+# remove ,
+df$`GDP (Billions, PPP)` <- gsub(',', '', df$`GDP (Billions, PPP)`, fixed = TRUE)
+df$`GDP per Capita (PPP)` <- gsub(',', '', df$`GDP per Capita (PPP)`, fixed = TRUE)
+
+for(i in 5:ncol(df)) {
+    df[[i]] <- as.numeric(df[[i]])
+}
+
+df <- df[complete.cases(df),]
+
+
+df$category <- 0
+auth <- which(df$`Democracy Index` <= 4)
+hybrid <- which(df$`Democracy Index` > 4 & df$`Democracy Index` <= 6)
+flawed <- which(df$`Democracy Index` > 6 & df$`Democracy Index` <= 8)
+demo <- which(df$`Democracy Index` > 8)
+
+# give labels
+df$category[auth] <- "Authoritarian"
+df$category[hybrid] <- "Hybrid"
+df$category[flawed] <- "Flawed Democracy"
+df$category[demo] <- "Democracy"
+
+remove <- which(df$category == "0")
+df$category[remove] <- NA
+df$is_democracy <- as.numeric(df$category == "Democracy" | df$category == "Flawed Democracy")
+```
+
+
+### EDA
+
+```{r, fig.height = 10, fig.width = 10, eval = TRUE}
+summary(df)
+
+# histogram of our variable of interest
+hist(df$`Democracy Index`, breaks = seq(1,10,0.5),
+     main = "Histogram of the Democracy Index",
+     xlab = "Democracy Index")
+
+#Making all headers wrapped
+wrapping <- strwrap(names(df), width = 10, simplify = FALSE)
+wrappingcol <- vapply(wrapping, paste, collapse = "\n", FUN.VALUE = character(1))
+df1 <- df
+names(df1) <- wrappingcol
+
+
+# 1st set
+political <- cbind(df1[,8:13], df1[,34])
+freedom <- cbind(df1[,14:19], df1[,34])
+economic1 <- cbind(df1[,20:25], df1[,34])
+economic2 <- cbind(df1[,26:30], df1[,34])
+economic3 <- cbind(df1[,31:33], df1[,34])
+
+library(lattice)
+# Making scatterplot matrix
+splom(political, groups=NULL, axis.line.tck = 0,
+      axis.text.alpha = 0,
+      varname.cex = 0.6,
+      main = "Democracy Index vs. Rule of Law")
+#
+
+splom(freedom, groups=NULL, 
+      data=freedom, axis.line.tck = 0,
+      axis.text.alpha = 0,
+      varname.cex = 0.6,
+      main= "Democracy Index vs. Regulatroy Efficiency and Open Markets Measures")
+# trends upwards with freedom
+
+splom(economic1, groups=NULL, 
+      data=economic1, axis.line.tck = 0,
+      axis.text.alpha = 0,
+      varname.cex = 0.6,
+      main = "Democracy Index vs. Government Size")
+
+# trends upwards with taxes, populations and tariffs not so much
+
+splom(economic2, groups=NULL, 
+      data=economic2, axis.line.tck = 0,
+      axis.text.alpha = 0,
+      varname.cex = 0.6,
+      main = "Democracy Index vs. Unemployment and GDP Variables")
+
+splom(economic3, groups=NULL, 
+      data=economic3, axis.line.tck = 0,
+      axis.text.alpha = 0,
+      varname.cex = 0.6,
+      main = "Democracy Index vs. Public Debt, FDI Inflow, and Inflation Variables")
+
+```
+
+The histogram shows us that there is variation in the extent of democracy in a country. Most countries are between 3 and 8 on democractic scale. From the scatter matrices, we see that he extent of democracy in a country is strongly positive correlated with Property Rights, Judicial Effectiveness, Government Integrity, Taxes as a % of GDP, and all freedom measures. 
+
+The scatter plot matrix does not allow us to easily see realtionships between variables where there are outliers. Particularly, for GDP per capita, Government Expenditure as a percent of GDP, and FDI inflows, we can remove the outliers to understand the general trend.
+
+```{r}
+df <- df[order(df$`GDP per Capita (PPP)`),]
+
+eda_plot1 <- plot(df$`GDP per Capita (PPP)`[1:(nrow(df)-5)], df$`Democracy Index`[1:(nrow(df)-5)],
+                  xlab = "GDP per Capita",
+                  ylab = "Democracy Index")
+
+df <- df[order(df$`Gov't Expenditure % of GDP`),]
+eda_plot2 <- plot(df$`Gov't Expenditure % of GDP`[1:(nrow(df)-5)], df$`Democracy Index`[1:(nrow(df)-5)],
+                  xlab = "Gov't Expenditure (% of GDP)",
+                  ylab = "Democracy Index")
+
+df <- df[order(df$`FDI Inflow (Millions)`),]
+eda_plot2 <- plot(df$`FDI Inflow (Millions)`[1:(nrow(df)-7)], df$`Democracy Index`[1:(nrow(df)-7)],
+                  xlab = "FDI Inflow in Millions",
+                  ylab = "Democracy Index")
+
+```
+
+We see that after removing outliers, the extent of democracy is strongly positively correlated with Government expenditure. The relationship with GDP per capita is moderate and positive. Surprisingly, there is no obvious correlation between FDI inflows and democracy.
+
+Boxplots can also help us see if some measures we are interested in vary by the type of government in a country.
+```{r}
+# economic meausre
+boxplot(df$`GDP per Capita (PPP)` ~ df$category,
+        main = "Varying GDP by Type of Goverment",
+        ylab = "GDP per capita (PPP) in USD",
+        xlab = "Type of Government")
+
+# freedom measure
+boxplot(df$`2019 Score` ~ df$category,
+        main = "Varying 2019 score by Type of Government",
+        ylab = "2019 score",
+        xlab = "Type of Government")
+
+# government health measure
+boxplot(df$`Fiscal Health` ~ df$category,
+        main = "Varying Fiscal Health by Type of Government",
+        ylab = "Fiscal Health score",
+        xlab = "Type of Government")
+
+# attractiveness from external measure
+boxplot(log(df$`FDI Inflow (Millions)`) ~ df$category, 
+        ylim = c(0, log(max(df$`FDI Inflow (Millions)`, na.rm = TRUE))),
+        main = "Varying FDI Inflow in Millions by Type of Government",
+        ylab = "Log of FDI Inflow (Originally in Millions of USD)",
+        xlab = "Type of Government")
+
+```
+
+We can see from the boxplots that FDI inflows, GDP per capita and freedom scores vary tremendously by the kind of governance in a country. The median GDP per capita, freedom and FDI inflow decreases with government regimes that are less democratic. It is interesting to note that from the scatterplot, FDI inflows seemed uncorrelated with democracy index. However, it may help us predict the kind of government in a country. All these plots combined show us that the research question may be worth pursuing since it may be possible to predict the level of democratization using measures in our dataset.
+
+To give you an idea of what we are thinking of when trying to answer this question, we build 2 preliminary models to predict GDP using measures in our data. The first uses backward selection to build a parsimonious model. The second uses a logistic lasso.
+
+Since logistic regressions are not evaluated using adjusted $R^2$, we will use the p-value approach for backward selection.
+
+### Analysis
+
+##### backward selection
+
+```{r}
+democlogist1 <- glm(is_democracy ~ `GDP per Capita (PPP)` +
+                                       `2019 Score` +
+                                       `Fiscal Health` +
+                                       `FDI Inflow (Millions)`, 
+                   data = df,
+                   family=binomial(link="logit"))
+
+summary(democlogist1)
+
+# We find that the variables GDP per Capita have little correlation as seen by its high p-value of 0.6610. Thus, we run the logistic regression again.
+
+democlogist2 <- glm(is_democracy ~ `2019 Score` +
+                                  `Fiscal Health` +
+                                  `FDI Inflow (Millions)`, 
+                   data = df,
+                   family=binomial(link="logit"))
+
+summary(democlogist2)
+
+# Now, the variable FDI Inflow in Millions has a much higher p-value of 0.2571, let's remove it and re-run the regression.
+
+democlogist3 <- glm(is_democracy ~ `2019 Score` +
+                                  `Fiscal Health`, 
+                   data = df,
+                   family=binomial(link="logit"))
+
+summary(democlogist3)
+
+# We have obtained our model. Now we can evaluate it using the ROC curve.
+
+library(ROCR)
+set <- df[complete.cases(df$is_democracy), ]
+set <- set[complete.cases(set$`2019 Score`), ]
+
+pred = predict(democlogist3, type="response")
+predObj = prediction(pred, set$is_democracy)
+rocObj = performance(predObj, measure="tpr", x.measure="fpr")
+aucObj = performance(predObj, measure="auc")
+roc_backward <- 
+  plot(rocObj, main = paste("Area under the curve:",
+       round(aucObj@y.values[[1]] ,4)))
+
+df$predicted_backward <- pred
+
+box_backward <- 
+  boxplot(df$predicted_backward ~ df$is_democracy, ylim = c(0.0,1),
+          ylab = "Predicted Values", names = c("Non-Democratic (0)", 
+                                              "Democratic (1)"),
+          col = "red")
+
+alpha <- round(as.numeric(unlist(rocObj@alpha.values)),4) 
+fpr <- round(as.numeric(unlist(rocObj@x.values)),4)
+tpr <- round(as.numeric(unlist(rocObj@y.values)),4)
+
+par(mar = c(5,5,2,5))
+plot(alpha,tpr, xlab="Threshold", xlim=c(0,1), 
+     ylab="True positive rate", type="l")
+par(new="True")
+plot(alpha,fpr, xlab="", ylab="", axes = FALSE, xlim=c(0,1), type="l" ) 
+axis(side=4)
+mtext(side=4, line=3, "False positive rate") 
+text(0.58,0.58,"TPR")
+text(0.18,0.18,"FPR")
+
+
+```
+
+##### Logit Lasso
+
+```{r}
+library(lars)
+library(glmnet)
+
+data <- df[complete.cases(df),]
+y.train <- as.factor(data$is_democracy)
+x.train <- data[,-c(1:6,34:36)]
+x.train <- as.matrix(x.train)
+
+fit.lasso.cv <- cv.glmnet(x.train, y.train, alpha=1, family = "binomial")
+
+# plot of cross validated mean square error
+plot(fit.lasso.cv)
+coef(fit.lasso.cv, fit.lasso.cv$lambda.min)
+
+# lasso selection of variables
+fit.lasso <- glmnet(x.train, y.train, alpha=1, family = "binomial")
+plot(fit.lasso, xvar="lambda")
+
+# comparing predicted probabilities
+yhat <- predict(fit.lasso.cv, x.train, s= "lambda.min", type = "response")
+
+box_lasso <- 
+  boxplot(yhat ~ y.train, 
+          col = "red",
+          ylab = "Predicted Probabilities",
+          names = c("Non-democratic (0)", "Democratic (1)"))
+
+
+predObj <- prediction(yhat, df$is_democracy)
+rocObj <- performance(predObj, measure="tpr", x.measure="fpr") 
+aucObj <- performance(predObj, measure="auc") 
+roc_lasso <- plot(rocObj, main = paste("Area under the curve:", round(aucObj@y.values[[1]] ,4)))
+
+# extract the alpha(threshold), FPR, and TPR values from rocObj
+alpha <- round(as.numeric(unlist(rocObj@alpha.values)),4) 
+fpr <- round(as.numeric(unlist(rocObj@x.values)),4)
+tpr <- round(as.numeric(unlist(rocObj@y.values)),4)
+
+par(mar = c(5,5,2,5))
+plot(alpha,tpr, xlab="Threshold", xlim=c(0,1), 
+     ylab="True positive rate", type="l")
+par(new="True")
+plot(alpha,fpr, xlab="", ylab="", axes = FALSE, xlim=c(0,1), type="l" ) 
+axis(side=4)
+mtext(side=4, line=3, "False positive rate") 
+text(0.58,0.58,"TPR")
+text(0.18,0.18,"FPR")
+
+threshold <- 0.6
+tp <- length(which(yhat >= threshold & y.train == 1))
+fp <- length(which(yhat >= threshold & y.train == 0))
+tn<- length(which(yhat < threshold & y.train == 0))
+fn <- length(which(yhat < threshold & y.train == 1))
+
+accuracy_lasso <- (tp + tn)/(tp + tn + fp + fn)
+tpr_lasso <- tp/(tp + fn)
+fpr_lasso <- fp/(fp + tn)
+precision_lasso <- tp/(tp + fp)
+fnr_lasso <- fn/(fn + tp)
+
+table1 <- data.frame(AUC = round(aucObj@y.values[[1]] ,4),
+                     Accuracy = accuracy_lasso,
+                     Precision = precision_lasso,
+                     FPR = fpr_lasso,
+                     TPR = tpr_lasso,
+                     FNR = fnr_lasso)
+
+```
+
+##### Decision Trees with Picked Variables
+
+```{r}
+library(rpart)
+library(rpart.plot)
+
+df_tree <- as.data.frame(x.train)
+df_tree$is_democracy <- y.train
+
+# fit <- rpart(is_democracy ~ `Investment Freedom` +
+#               `Trade Freedom` +
+#               `Fiscal Health` +
+#               `Property Rights` +
+#               `Corporate Tax Rate (%)` +
+#               `Tax Burden % of GDP` +
+#               `Population (Millions)` +
+#               `GDP Growth Rate (%)`,
+#               data = df,
+#               method="class", control=rpart.control(minsplit=20, cp = .01),
+#               cp = 0.01)
+
+fit <- rpart(is_democracy ~ .,
+              data = df_tree,
+              method="class", control=rpart.control(minsplit=20, cp = .01),
+              cp = 0.01)
+
+rpart.plot(fit, extra = 2, type = 4, clip.right.labs = FALSE,
+           varlen = 0, faclen = 0)
+
+?rpart.plot
+
+
+# In the decision tree, the 1s and 0s on the top of the nodes indicate whether a country is democratic or not. We find that out of the variables picked, Investment Freedom maximises the information gain when predicting whether a country is democratic or not. In other words, the entropy of the is_democratic vairable knowing its corresponding Investment Freedom is very little in comparison to entropy of the democracy variable. This is followed by Property Rights, Corporate Tax Rate, and finally GDP Growth Rate.
+
+summary(fit)
+
+
+# Looking at the summary of these variables, we actually find that the variable Property Rights and Investments Rates actually both maximised the information gain, ie. their had the same information gain which was the greatest among the other variables. 
+
+library(ROCR)
+
+df_tree$predicted_tree <- predict(fit, type = "prob")[,2]
+predObj <- prediction(predict(fit, type = "prob")[, 2], df_tree$is_democracy)
+rocObj <- performance(predObj, measure="tpr", x.measure="fpr") 
+aucObj <- performance(predObj, measure="auc") 
+roc_tree <- plot(rocObj, main = paste("Area under the curve:", round(aucObj@y.values[[1]] ,4)))
+box_tree <- 
+  boxplot(df_tree$predicted_tree ~ df_tree$is_democracy, 
+          col = "red",
+          ylab = "Predicted Probabilities",
+          names = c("Non-democratic (0)", "Democratic (1)"))
+
+# extract the alpha(threshold), FPR, and TPR values from rocObj
+alpha <- round(as.numeric(unlist(rocObj@alpha.values)),4) 
+fpr <- round(as.numeric(unlist(rocObj@x.values)),4)
+tpr <- round(as.numeric(unlist(rocObj@y.values)),4)
+
+# let alpha = 0.6
+
+threshold <- 0.6
+tp <- length(which(df_tree$predicted_tree >= threshold & df_tree$is_democracy == 1))
+fp <- length(which(df_tree$predicted_tree >= threshold & df_tree$is_democracy == 0))
+tn <- length(which(df_tree$predicted_tree < threshold & df_tree$is_democracy == 0))
+fn <- length(which(df_tree$predicted_tree < threshold & df_tree$is_democracy == 1))
+
+accuracy_tree <- (tp + tn)/(tp + tn + fp + fn)
+tpr_tree <- tp/(tp + fn)
+fpr_tree <- fp/(fp + tn)
+precision_tree <- tp/(tp + fp)
+fnr_tree <- fn/(fn + tp)
+
+tree_row <- list(round(aucObj@y.values[[1]] ,4), accuracy_tree, precision_tree, fpr_tree,
+              tpr_tree, fnr_tree)
+
+table1 <- rbind(table1, tree_row)
+
+table1$model <- c("Logit Lasso", "Tree")
+table1$evlualtion <- "In-Sample"
+
+```
+
+### Plotting tree and logit lasso
+```{r}
+# evaluate all side-by-side
+
+```
+
+
+### Re-run analysis and evaluate using out of sample performance
+
+##### Lasso
+```{r}
+data <- df[complete.cases(df),]
+train <- sample(nrow(data), 0.8*nrow(data), replace = FALSE)
+train_set <- data[train,]
+test_set <- data[-train,]
+
+### logit lasso
+
+library(lars)
+library(glmnet)
+
+y.train_set <- as.factor(train_set$is_democracy)
+x.train_set <- train_set[,-c(1:6,34:36)]
+x.train_set$is_democracy <- NULL
+x.train_set <- as.matrix(x.train_set)
+
+y.test_set <- as.factor(test_set$is_democracy)
+x.test_set <- test_set[,-c(1:6,34:36)]
+x.test_set$is_democracy <- NULL
+x.test_set <- as.matrix(x.test_set)
+
+fit.lasso.cv <- cv.glmnet(x.train_set, y.train_set, alpha=1, family = "binomial")
+
+# comparing predicted probabilities
+yhat_test <- predict(fit.lasso.cv, x.test_set, s= "lambda.min", type = "response")
+
+box_lasso <- 
+  boxplot(yhat_test ~ y.test_set, 
+          col = "red",
+          ylab = "Predicted Probabilities",
+          names = c("Non-democratic (0)", "Democratic (1)"))
+
+
+predObj <- prediction(yhat_test,y.test_set)
+rocObj <- performance(predObj, measure="tpr", x.measure="fpr") 
+aucObj <- performance(predObj, measure="auc") 
+roc_lasso <- plot(rocObj, main = paste("Area under the curve:", round(aucObj@y.values[[1]] ,4)))
+
+# extract the alpha(threshold), FPR, and TPR values from rocObj
+alpha <- round(as.numeric(unlist(rocObj@alpha.values)),4) 
+fpr <- round(as.numeric(unlist(rocObj@x.values)),4)
+tpr <- round(as.numeric(unlist(rocObj@y.values)),4)
+
+par(mar = c(5,5,2,5))
+plot(alpha,tpr, xlab="Threshold", xlim=c(0,1), 
+     ylab="True positive rate", type="l")
+par(new="True")
+plot(alpha,fpr, xlab="", ylab="", axes = FALSE, xlim=c(0,1), type="l" ) 
+axis(side=4)
+mtext(side=4, line=3, "False positive rate") 
+text(0.58,0.58,"TPR")
+text(0.18,0.18,"FPR")
+
+```
+
+##### Tree
+
+```{r}
+library(rpart)
+library(rpart.plot)
+df_tree_train <- as.data.frame(x.train_set)
+df_tree_train$is_democracy <- y.train_set
+
+df_tree_test <- as.data.frame(x.test_set)
+df_tree_test$is_democracy <- y.test_set
+
+fit <- rpart(is_democracy ~ .,
+              data = df_tree_train,
+              method="class", control=rpart.control(minsplit=20, cp = .01),
+              cp = 0.01)
+
+rpart.plot(fit, extra = 2, type = 4, clip.right.labs = FALSE,
+           varlen = 0, faclen = 0)
+
+?rpart.plot
+
+summary(fit)
+
+library(ROCR)
+
+df_tree_test$predicted_tree <- predict(fit, newdata = df_tree_test, type = "prob")[,2]
+predObj <- prediction(df_tree_test$predicted_tree, df_tree_test$is_democracy)
+rocObj <- performance(predObj, measure="tpr", x.measure="fpr") 
+aucObj <- performance(predObj, measure="auc") 
+roc_tree <- plot(rocObj, main = paste("Area under the curve:", round(aucObj@y.values[[1]] ,4)))
+box_tree <- 
+  boxplot(df_tree_test$predicted_tree ~ df_tree_test$is_democracy, 
+          col = "red",
+          ylab = "Predicted Probabilities",
+          names = c("Non-democratic (0)", "Democratic (1)"))
+
+# extract the alpha(threshold), FPR, and TPR values from rocObj
+alpha <- round(as.numeric(unlist(rocObj@alpha.values)),4) 
+fpr <- round(as.numeric(unlist(rocObj@x.values)),4)
+tpr <- round(as.numeric(unlist(rocObj@y.values)),4)
+
+```
+

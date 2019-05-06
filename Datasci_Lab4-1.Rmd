@@ -1,0 +1,128 @@
+---
+title: "Datasci_Lab4"
+author: "Scott Chua, Chandler Beyer, Joyce Li, Abdul Sharapov"
+date: "2/22/2019"
+submitted by: Scott
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+heart = read.csv("Lab_4_heart.csv")
+```
+## Exercise 1.
+In the backward stepwise regression, we start at a full model:
+```{r}
+Exer1model1 = glm(target ~ age + sex + trestbps + chol + fbs + thalach + exang, data = heart, family=binomial(link="logit"))
+print(summary(Exer1model1)$coefficient[,4])
+```
+(All values presented are p-values of the variables' coefficients.)
+
+Now we remove the one variable with the largest p-value above the chosen significance level. The coefficient on _fbs_ has the largest p-value of 0.6281. We eliminate _fbs_ and re-run the model:
+```{r}
+Exer1model2 = glm(target ~ age + sex + trestbps + chol + thalach + exang, data = heart, family=binomial(link="logit"))
+print(summary(Exer1model2)$coefficient[,4])
+```
+Among the remaining variables, the coefficient on _age_ has the largest p-value of 0.2249, which is larger than the chosen significance level of 0.001. We eliminate _age_ and re-run the model:
+```{r}
+Exer1model3 = glm(target ~ sex + trestbps + chol + thalach + exang, data = heart, family=binomial(link="logit"))
+print(summary(Exer1model3)$coefficient[,4])
+```
+Among the remaining variables, the coefficient on _chol_ has the largest p-value of 0.0138, which is larger than the chosen significance level of 0.001. We eliminate _chol_ and re-run the model:
+```{r}
+Exer1model4 = glm(target ~ sex + trestbps + thalach + exang, data = heart, family=binomial(link="logit"))
+print(summary(Exer1model4)$coefficient[,4])
+```
+Among the remaining variables, the coefficient on _trestbps_ has the largest p-value of 0.00958, which is larger than the chosen significance level of 0.001. We eliminate _trestbps_ and re-run the model:
+```{r}
+Exer1model5 = glm(target ~ sex + thalach + exang, data = heart, family=binomial(link="logit"))
+print(summary(Exer1model5)$coefficient[,4])
+summary(Exer1model5)
+```
+As there are no more variables with p-values greater than the chosen significance level 0.001, we do not eliminate any more variables. We have arrived at a parsimonious backward model for the presence of heart disease, with gender ( _sex_), maximum heart rate achieved ( _thalach_), and a dummy for exercise induced angina ( _exang_) as the remaining predictors.
+
+##Exercise 2.
+Maximum resting heart rate achieved _thalach_ is the variable whose coefficient has the smallest p-value. For every 1-bpm (beats per minute) increase in maximum achieved heart rate, the log odds ratio of the participant having heart disease increases by 0.0373.
+
+##Exercise 3.
+```{r}
+heart1 = heart
+heart1$predictedprob = predict(Exer1model5, heart1, type="response")
+group0 = heart1[heart1$target == 0, 9]
+group1 = heart1[heart1$target == 1, 9]
+labels = c("Heart Disease Absent", "Heart Disease Present")
+boxplot(group0, group1, names = labels, main = "Predicted Probability of Heart Disease\ngrouped by Observed Incidence of Heart Disease", ylab = "Predicted Probability")
+```
+
+We observe from the boxplot that the predicted probabilities of heart disease, for the group with no heart disease (_target_ = 0), are clumped toward 0. Similarly, the predicted probabilities of heart disease, for the group with heart disease (_target_ = 1), are clumped toward 1. This is an ideal characteristic of a model with good classificatory power.
+
+Additionally, the difference in medians between the two groups is very distinct; also, their IQRs do not overlap. These heuristics support the conclusion that the classification model has good predictive power.
+
+##Exercise 4.
+In the forward selection model, we begin with a model with no predictors, and add the one variable that returns the smallest p-value below the chosen significance level of 0.001. 
+```{r}
+Exer4modela = glm(target ~ age, data = heart, family = binomial(link = "logit"))
+Exer4modelb = glm(target ~ sex, data = heart, family = binomial(link = "logit"))
+Exer4modelc = glm(target ~ trestbps, data = heart, family = binomial(link = "logit"))
+Exer4modeld = glm(target ~ chol, data = heart, family = binomial(link = "logit"))
+Exer4modele = glm(target ~ fbs, data = heart, family = binomial(link = "logit"))
+Exer4modelf = glm(target ~ thalach, data = heart, family = binomial(link = "logit"))
+Exer4modelg = glm(target ~ exang, data = heart, family = binomial(link = "logit"))
+paste("P-value of age: ", summary(Exer4modela)$coefficient[2,4])
+paste("P-value of sex: ", summary(Exer4modelb)$coefficient[2,4])
+paste("P-value of trestbps: ", summary(Exer4modelc)$coefficient[2,4])
+paste("P-value of chol: ", summary(Exer4modeld)$coefficient[2,4])
+paste("P-value of fbs: ", summary(Exer4modele)$coefficient[2,4])
+paste("P-value of thalach: ", summary(Exer4modelf)$coefficient[2,4])
+paste("P-value of exang: ", summary(Exer4modelg)$coefficient[2,4])
+```
+The variable whose coefficient has the smallest p-value below the chosen significance level of 0.0001 is _exang_. We add it as a predictor to the model, and cycle through the rest of the variables:
+```{r}
+Exer4modelh = glm(target ~ exang + age, data = heart, family = binomial(link = "logit"))
+Exer4modeli = glm(target ~ exang + sex, data = heart, family = binomial(link = "logit"))
+Exer4modelj = glm(target ~ exang + trestbps, data = heart, family = binomial(link = "logit"))
+Exer4modelk = glm(target ~ exang + chol, data = heart, family = binomial(link = "logit"))
+Exer4modell = glm(target ~ exang + fbs, data = heart, family = binomial(link = "logit"))
+Exer4modelm = glm(target ~ exang + thalach, data = heart, family = binomial(link = "logit"))
+paste("P-value of age: ", summary(Exer4modelh)$coefficient[3,4])
+paste("P-value of sex: ", summary(Exer4modeli)$coefficient[3,4])
+paste("P-value of trestbps: ", summary(Exer4modelj)$coefficient[3,4])
+paste("P-value of chol: ", summary(Exer4modelk)$coefficient[3,4])
+paste("P-value of fbs: ", summary(Exer4modell)$coefficient[3,4])
+paste("P-value of thalach: ", summary(Exer4modelm)$coefficient[3,4])
+```
+The next variable whose coefficient has the smallest p-value below the chosen significance level of 0.0001 is _thalach_. We add it to the model, and cycle through the rest of the variables:
+```{r}
+Exer4modeln = glm(target ~ exang + thalach + age, data = heart, family = binomial(link = "logit"))
+Exer4modelo = glm(target ~ exang + thalach + sex, data = heart, family = binomial(link = "logit"))
+Exer4modelp = glm(target ~ exang + thalach + trestbps, data = heart, family = binomial(link = "logit"))
+Exer4modelq = glm(target ~ exang + thalach + chol, data = heart, family = binomial(link = "logit"))
+Exer4modelr = glm(target ~ exang + thalach + fbs, data = heart, family = binomial(link = "logit"))
+paste("P-value of age: ", summary(Exer4modeln)$coefficient[4,4])
+paste("P-value of sex: ", summary(Exer4modelo)$coefficient[4,4])
+paste("P-value of trestbps: ", summary(Exer4modelp)$coefficient[4,4])
+paste("P-value of chol: ", summary(Exer4modelq)$coefficient[4,4])
+paste("P-value of fbs: ", summary(Exer4modelr)$coefficient[4,4])
+```
+The next variable whose coefficient has the smallest p-value below the chosen significance level of 0.0001 is _sex_. We add it to the model, and cycle through the rest of the variables:
+```{r}
+Exer4models = glm(target ~ exang + thalach + sex + age, data = heart, family = binomial(link = "logit"))
+Exer4modelt = glm(target ~ exang + thalach + sex + trestbps, data = heart, family = binomial(link = "logit"))
+Exer4modelu = glm(target ~ exang + thalach + sex + chol, data = heart, family = binomial(link = "logit"))
+Exer4modelv = glm(target ~ exang + thalach + sex + fbs, data = heart, family = binomial(link = "logit"))
+paste("P-value of age: ", summary(Exer4models)$coefficient[5,4])
+paste("P-value of trestbps: ", summary(Exer4modelt)$coefficient[5,4])
+paste("P-value of chol: ", summary(Exer4modelu)$coefficient[5,4])
+paste("P-value of fbs: ", summary(Exer4modelv)$coefficient[5,4])
+```
+As there are no more variables whose coefficients have p-values below 0.0001, we do not add any more variables. We have arrived at a parsimonious forward model for the presence of heart disease, with gender ( _sex_), maximum heart rate achieved ( _thalach_), and a dummy for exercise induced angina ( _exang_) as the remaining predictors.
+
+## Exercise 5.
+In this instance, our final models from forward selection and backward elimination are the same (i.e. have the same predictors). However, this does not mean that the final models from forward selection and backward elimination are always the same. This is because the p-value of any single predictor variable is affected by the presence or absence of other predictor variables. Because stepwise regression is greedy, it only explores a limited subset of possible combinations of predictor variables.
+
+It is plausible, for instance, to forward-add a variable that is significant when added to the null model, _and yet_ drop the same variable from a full model where its explanatory power has been attributed to other variables it is multicollinear with.
